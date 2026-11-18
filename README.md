@@ -6,14 +6,17 @@ The screens: Home (ready, sharing, upstream lost), Starting Hotspot (the log), S
 
 ## Builds
 
-Every push, on any branch, runs `.github/workflows/build.yml` on a macOS runner and produces `SevenSeas.ipa` and `SevenSeas.tipa` (the same file, signed with the entitlements in `entitlements.plist` via `ldid`).
+Every push, on any branch, runs `.github/workflows/main.yml` on a macOS runner and produces `SevenSeas.ipa` and `SevenSeas.tipa` (the same file, signed with the entitlements in `entitlements.plist` via `ldid`).
 
 * **Any commit:** open the run under the **Actions** tab, then **Artifacts** at the bottom.
 * **Default branch:** the run also publishes a **Release** named `1.0.<run number>` with both files and `SHA256SUMS`. The notes are the first line of each commit message in the push.
+* **A tag** like `v1.1.0` publishes `1.1.0` instead (`tools/release_version.sh`).
 
 The version is `1.0` plus the run number; the build number is the run number. Change the `1.0` in `project.yml` (`MARKETING_VERSION`).
 
 If a build fails, the run prints the compiler errors in the **Show compiler errors** step and uploads the full `build.log`.
+
+To build locally: `xcodegen generate`, build the scheme for a generic iOS device into `build/DerivedData`, then `bash tools/package.sh`.
 
 ## Installing
 
@@ -22,9 +25,11 @@ Open `SevenSeas.tipa` (or the `.ipa`) in TrollStore on the phone.
 ## Layout
 
 ```
-.github/workflows/build.yml   CI: XcodeGen, xcodebuild, ldid, release
+.github/workflows/main.yml    CI: XcodeGen, xcodebuild, ldid, release
 project.yml                   XcodeGen project (bundle id, version, iOS 16.0+)
 entitlements.plist            applied by ldid after the build
+tools/                        release_version.sh, package.sh (CI calls both; package.sh also works locally)
+docs/                         research notes and interface sources
 SevenSeas/
   App/        entry point, app info and license text
   Model/      AppModel (all state), settings, devices, theme table
@@ -33,6 +38,11 @@ SevenSeas/
   Panels/     Settings, Devices, Status and their pushed pages
   Resources/  asset catalog: icon, 10 backgrounds, thumbnails, wordmark
 ```
+
+## Documentation
+
+* [`docs/research`](docs/research/README.md): why the phone drops its Wi-Fi when the stock hotspot starts, what was found in `wifid`, `misd` and the Broadcom driver, what the phone actually did, and the experiments that would settle the rest.
+* [`docs/interface.md`](docs/interface.md): where the layout, typography and themes come from.
 
 ## Connecting the real service
 

@@ -24,8 +24,14 @@ targets:
       path: Config/Info.plist
       properties:
         CFBundleDisplayName: SevenSeas
+        # Without these two, XcodeGen writes literal defaults and the app would report 1.0 (1)
+        # whatever CI built. About reads them through AppInfo.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true
         UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
         UIUserInterfaceStyle: Dark
         UIRequiredDeviceCapabilities:
           - arm64
@@ -40,3 +46,10 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_BITCODE: NO
+
+# CI builds with -scheme SevenSeas, so the scheme is declared rather than left to Xcode.
+schemes:
+  SevenSeas:
+    build:
+      targets:
+        SevenSeas: all

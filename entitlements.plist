@@ -5,7 +5,7 @@
 	<!--
 	The frontend needs no special entitlements. When the hotspot service is wired in, add what it
 	needs here (for example platform-application or com.apple.private.security.no-container).
-	ldid applies this file after the build, see .github/workflows/build.yml.
+	ldid applies this file after the build, see .github/workflows/main.yml.
 	-->
 </dict>
 </plist>

@@ -1,120 +1,167 @@
-name: Build IPA
+name: Build
 
-# Every push to any branch builds an IPA you can download from the run's Artifacts.
-# Pushes to the default branch also publish a GitHub Release (v1.0.<run number>).
+# Every push to any branch builds SevenSeas.ipa and SevenSeas.tipa; download them from the run's Artifacts.
+# A push to the default branch also publishes a GitHub Release, v<MARKETING_VERSION>.<run number> (v1.0.7), and a
+# pushed tag like v1.1.0 publishes 1.1.0 (tools/release_version.sh). Pull requests are built, never released.
+
 on:
   push:
     branches: ["**"]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
 
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: write
-
 jobs:
-  build:
-    runs-on: macos-14
+  app:
+    name: iOS app (Xcode)
+    runs-on: macos-15
     timeout-minutes: 30
     env:
       HOMEBREW_NO_AUTO_UPDATE: "1"
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Check out
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install XcodeGen and ldid
-        run: brew install xcodegen ldid
-
-      - name: Work out the version
+      - name: Version
         id: version
         run: |
-          BASE=$(grep -E '^[[:space:]]*MARKETING_VERSION:' project.yml | head -n 1 | sed -E 's/.*"([0-9]+(\.[0-9]+)*)".*/\1/')
-          VERSION="${BASE}.${GITHUB_RUN_NUMBER}"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Building SevenSeas ${VERSION}"
+          version="$(bash tools/release_version.sh)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building SevenSeas $version"
+
+      - name: Toolchain
+        run: xcodebuild -version
+
+      - name: XcodeGen and ldid
+        run: brew install xcodegen ldid
 
       - name: Generate the Xcode project
         run: xcodegen generate
 
-      - name: Build (unsigned)
+      - name: Build for device
         run: |
           set -o pipefail
-          xcodebuild \
-            -project SevenSeas.xcodeproj \
-            -scheme SevenSeas \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath build \
-            MARKETING_VERSION="${{ steps.version.outputs.version }}" \
-            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            ONLY_ACTIVE_ARCH=NO \
-            clean build 2>&1 | tee build.log
+          xcodebuild build -project SevenSeas.xcodeproj -scheme SevenSeas -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION="${{ steps.version.outputs.version }}" CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            2>&1 | tee build.log
 
       - name: Show compiler errors
         if: failure()
         run: grep -E "error:" build.log | sort -u | head -n 60 || true
 
-      - name: Upload the build log
+      - name: Keep the build log when it fails
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-log
+          name: build-log-${{ github.run_id }}-${{ github.run_attempt }}
           path: build.log
           if-no-files-found: ignore
 
-      - name: Package IPA and TIPA
-        run: |
-          APP=$(find build/Build/Products -maxdepth 2 -name "SevenSeas.app" -type d | head -n 1)
-          test -n "$APP" || { echo "SevenSeas.app was not produced"; exit 1; }
-          rm -rf Payload
-          mkdir Payload
-          cp -R "$APP" Payload/SevenSeas.app
-          ldid -Sentitlements.plist Payload/SevenSeas.app/SevenSeas
-          zip -qry SevenSeas.ipa Payload
-          cp SevenSeas.ipa SevenSeas.tipa
-          shasum -a 256 SevenSeas.ipa SevenSeas.tipa > SHA256SUMS
-          ls -lh SevenSeas.ipa SevenSeas.tipa SHA256SUMS
+      - name: Package SevenSeas.tipa and SevenSeas.ipa
+        run: bash tools/package.sh
 
-      - name: Release notes
-        run: |
-          BEFORE="${{ github.event.before }}"
-          if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            git log --no-merges --format='- %s' "${BEFORE}..${{ github.sha }}" > notes.md
-          fi
-          if [ ! -s notes.md ]; then
-            git log -1 --format='- %s' > notes.md
-          fi
-          cat notes.md
-
-      - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: SevenSeas-${{ steps.version.outputs.version }}
           path: |
-            SevenSeas.ipa
-            SevenSeas.tipa
-            SHA256SUMS
+            build/SevenSeas.tipa
+            build/SevenSeas.ipa
+            build/SHA256SUMS
           if-no-files-found: error
 
-      - name: Publish release
-        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-        uses: softprops/action-gh-release@v2
+  release:
+    name: Publish release
+    # Pushes to the default branch, tags and manual runs; never pull requests. Only after the build succeeded.
+    if: |
+      (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v'))
+      && github.event_name != 'pull_request'
+    needs: [app]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.app.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      COMMITS_JSON: ${{ toJSON(github.event.commits) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: ${{ steps.version.outputs.version }}
-          body_path: notes.md
-          target_commitish: ${{ github.sha }}
-          make_latest: "true"
-          files: |
-            SevenSeas.ipa
-            SevenSeas.tipa
-            SHA256SUMS
+          name: SevenSeas-${{ needs.app.outputs.version }}
+          path: release
+
+      - name: Verify the assets
+        run: |
+          set -euo pipefail
+          for f in release/SevenSeas.tipa release/SevenSeas.ipa release/SHA256SUMS; do
+            [ -s "$f" ] || { echo "::error::Missing or empty $f; not publishing an incomplete release"; exit 1; }
+          done
+          (cd release && sha256sum -c SHA256SUMS)
+
+      - name: Write release notes
+        run: |
+          set -euo pipefail
+          # The notes are this push's commit messages, one line each, as in Caz, Speaka and Octopus.
+          notes="$(jq -r '.[]? | "- " + (.message | split("\n")[0])' <<< "${COMMITS_JSON:-null}" || true)"
+          [ -n "$notes" ] || notes="- $(git log -1 --format=%s "$GITHUB_SHA")"
+          printf '%s\n' "$notes" > release-notes.md
+          cat release-notes.md
+
+      - name: Publish
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="$GITHUB_REF_NAME"        # a tag you pushed yourself, like v1.1.0
+          else
+            tag="v$VERSION"               # every push to the default branch: v1.0.7
+          fi
+          files=(release/SevenSeas.tipa release/SevenSeas.ipa release/SHA256SUMS)
+          # GitHub's release service sometimes fails partway: up to three tries, 30 s apart, each first clearing
+          # drafts GitHub Actions left behind (never anyone else's).
+          publish() {
+            local id
+            for id in $(gh api "repos/$GH_REPO/releases?per_page=100" \
+                          --jq '.[] | select(.draft and .author.login == "github-actions[bot]") | .id' 2>/dev/null || true); do
+              gh api -X DELETE "repos/$GH_REPO/releases/$id" >/dev/null 2>&1 || true
+            done
+            if gh release view "$tag" >/dev/null 2>&1; then
+              gh release upload "$tag" "${files[@]}" --clobber || return 1
+              gh release edit "$tag" --notes-file release-notes.md --draft=false || return 1
+            elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              gh release create "$tag" "${files[@]}" --verify-tag --title "$VERSION" \
+                --notes-file release-notes.md --latest || return 1
+            else
+              gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --title "$VERSION" \
+                --notes-file release-notes.md --latest || return 1
+            fi
+          }
+          for attempt in 1 2 3; do
+            if publish; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then
+              echo "::error::Publishing failed three times"
+              exit 1
+            fi
+            echo "::warning::Publishing failed (attempt $attempt of 3); trying again in 30 s"
+            sleep 30
+          done
+          echo "Published: https://github.com/$GH_REPO/releases/tag/$tag" | tee -a "$GITHUB_STEP_SUMMARY"
