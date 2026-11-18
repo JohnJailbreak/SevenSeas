@@ -23,6 +23,11 @@ targets:
     info:
       path: Config/Info.plist
       properties:
+        # Settings > Update Notifications: the background check (UpdateNotifications.taskID).
+        BGTaskSchedulerPermittedIdentifiers:
+          - sevenseas.update-check
+        UIBackgroundModes:
+          - fetch
         CFBundleDisplayName: SevenSeas
         # Without these two, XcodeGen writes literal defaults and the app would report 1.0 (1)
         # whatever CI built. About reads them through AppInfo.

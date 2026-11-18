@@ -1,7 +1,10 @@
+import Combine
 import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject var model: AppModel
+    @EnvironmentObject var updater: Updater
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         GeometryReader { geo in
@@ -9,6 +12,31 @@ struct RootView: View {
         }
         .ignoresSafeArea()
         .persistentSystemOverlays(model.sheet == .closed ? .automatic : .hidden)
+        .onAppear {
+            updater.check()
+            updater.watch(UpdatePrefs.notificationsEnabled)
+            UpdateNotifications.syncPermission()
+            if NotificationDelegate.openRequested { openUpdate() }   // the tap launched SevenSeas
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                // At once, so the Update Available a notification promised is there when SevenSeas opens.
+                updater.checkOnActivation()
+                UpdateNotifications.syncPermission()
+            }
+            updater.watch(UpdatePrefs.notificationsEnabled && phase == .active)
+            if phase == .background && UpdatePrefs.notificationsEnabled { UpdateNotifications.schedule() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NotificationDelegate.openUpdate)) { _ in
+            openUpdate()
+        }
+    }
+
+    /// A tapped notification opens the changelog, once the sheet is out of the way.
+    private func openUpdate() {
+        NotificationDelegate.openRequested = false
+        guard model.sheet == .closed else { return }
+        model.open(.update)
     }
 }
 

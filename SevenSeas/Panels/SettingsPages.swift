@@ -83,7 +83,7 @@ struct ThemePage: View {
                     model.themeID = theme.id
                 }
             }
-            PanelFooter(text: "Every theme uses the Lighthouse Beam icon.", height: 44)
+            PanelFooter(text: "Every theme uses the Lighthouse Beam icon, whose background is Morning Haze's sky.", height: 44)
         }
     }
 
@@ -98,7 +98,7 @@ struct ThemePage: View {
                 Text("Lighthouse Beam")
                     .font(.system(size: 17))
                     .foregroundColor(.white)
-                Text("App icon, follows the theme")
+                Text("App icon, drawn from Morning Haze")
                     .font(.system(size: 14))
                     .foregroundColor(Color.white.opacity(0.6))
             }

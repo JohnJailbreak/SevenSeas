@@ -4,6 +4,7 @@ import SwiftUI
 /// theme's window colour. Tapping outside closes it.
 struct WindowHost: View {
     @EnvironmentObject var model: AppModel
+    @EnvironmentObject var updater: Updater
     let size: CGSize
 
     var body: some View {
@@ -13,8 +14,10 @@ struct WindowHost: View {
                 .contentShape(Rectangle())
                 .onTapGesture { model.closeWindow() }
             panelContent
-                .frame(width: size.width - 2 * Metrics.sideMargin, height: panelHeight, alignment: .topLeading)
-                .background(model.theme.window)
+                .frame(width: size.width - 2 * Metrics.sideMargin, height: panelHeight,
+                       alignment: model.window == .update ? .center : .topLeading)
+                // The update screens have no card behind them, only the dimmed backdrop.
+                .background(model.window == .update ? Color.clear : model.theme.window)
                 .clipShape(RoundedRectangle(cornerRadius: Metrics.windowRadius, style: .continuous))
         }
         .frame(width: size.width, height: size.height)
@@ -29,6 +32,8 @@ struct WindowHost: View {
             DevicesPanel()
         case .status:
             StatusPanel()
+        case .update:
+            ChangelogView(updater: updater)
         case .closed:
             EmptyView()
         }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainScreen: View {
     @EnvironmentObject var model: AppModel
+    @EnvironmentObject var updater: Updater
     let layout: MainLayout
 
     var body: some View {
@@ -17,14 +18,27 @@ struct MainScreen: View {
                 .allowsHitTesting(!open)
                 .offset(x: layout.columnX, y: layout.menuTop + (open ? -75 : 0))
 
-            if model.sharing == .paused && !open {
-                UpstreamNotice(layout: layout)
+            // One slot, Dopamine's "Update Available" row. A paused hotspot is the more urgent of the two, so
+            // it takes the slot while sharing is paused and the update waits.
+            if !open {
+                if model.sharing == .paused {
+                    UpstreamNotice(layout: layout)
+                        .transition(.offset(y: 25).combined(with: .opacity))
+                } else if updater.isAvailable {
+                    UpdateLinkButton(title: "Update Available", symbol: "arrow.down.circle") {
+                        model.open(.update)
+                    }
+                    .frame(width: layout.columnWidth, height: 30)
+                    .offset(x: layout.columnX, y: layout.buttonTop - 20 - 30)
+                    .transition(.offset(y: 25).combined(with: .opacity))
+                }
             }
 
             ExpandingButton(layout: layout)
         }
         .frame(width: layout.size.width, height: layout.size.height, alignment: .topLeading)
         .animation(Anim.sheet, value: model.sheet)
+        .animation(.spring(response: 0.5, dampingFraction: 0.9), value: updater.isAvailable)
     }
 }
 

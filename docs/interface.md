@@ -97,3 +97,25 @@ between the two is the mockup being approximate, not the app.
 
 The app icon is Lighthouse Beam, one icon for every theme, rendered at each iPhone slot size plus the 1024 pt marketing
 icon. `IconPreview.imageset` is the same artwork at 288 px for the Theme and About pages.
+
+### Why the icon's background is darker than the theme
+
+The icon's background is a two-stop vertical gradient whose colours are sampled from the Morning Haze background
+itself: the mean of its top band and the mean of a band just past its middle, each scaled to a target relative
+luminance while keeping its hue.
+
+| | Sampled from Morning Haze | In the icon |
+|---|---|---|
+| Top | `(85, 105, 126)` | `(13, 16, 19)`, relative luminance 0.06 |
+| Bottom | `(118, 183, 240)` | `(57, 88, 116)`, relative luminance 0.33 |
+
+The icon is darker than the theme on purpose. Morning Haze is a pale sky: white on its own colours gives a contrast
+ratio of about 1.0 at the bottom of the image and 2.0 behind the glyph, so a white lighthouse on the untouched sky is
+invisible at 60 px. Scaled into this range it is roughly 14:1 behind the glyph, and the hue is unchanged, so the icon
+still belongs to the theme. The sampled bottom colour lands on `(57, 88, 116)`, within a few units of the theme's own
+card colour `2E475C` = `(46, 71, 92)`, which is itself that sky darkened.
+
+Four other treatments were rendered and rejected: the sky used as-is (illegible), the sky graded down (murky, the
+clouds read as smudges), its top band alone (nearly black, loses the blue) and a graded version with saturation pushed
+back up (brown patches). The icon is one artwork for all ten themes; iOS alternate icons would be needed for per-theme
+icons, and they are not implemented.

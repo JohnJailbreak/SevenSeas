@@ -4,6 +4,8 @@ Wi-Fi to Wi-Fi hotspot for a jailbroken iPhone (Dopamine, rootless). This reposi
 
 The screens: Home (ready, sharing, upstream lost), Starting Hotspot (the log), Select Security, Settings, Theme, Devices, Status and About. The ten Morning Haze backgrounds and the Lighthouse Beam icon are included.
 
+It also updates itself: it checks this repository's releases, shows the changelog and hands the new build to TrollStore. See [`docs/updates.md`](docs/updates.md).
+
 ## Builds
 
 Every push, on any branch, runs `.github/workflows/main.yml` on a macOS runner and produces `SevenSeas.ipa` and `SevenSeas.tipa` (the same file, signed with the entitlements in `entitlements.plist` via `ldid`).
@@ -42,7 +44,8 @@ SevenSeas/
 ## Documentation
 
 * [`docs/research`](docs/research/README.md): why the phone drops its Wi-Fi when the stock hotspot starts, what was found in `wifid`, `misd` and the Broadcom driver, what the phone actually did, and the experiments that would settle the rest.
-* [`docs/interface.md`](docs/interface.md): where the layout, typography and themes come from.
+* [`docs/interface.md`](docs/interface.md): where the layout, typography, themes and app icon come from.
+* [`docs/updates.md`](docs/updates.md): the update flow, and what differs from Octopus's (no root helper here).
 
 ## Connecting the real service
 
@@ -56,6 +59,8 @@ SevenSeas/
 | Connected devices | `devices`, `liveDevices` |
 | Upstream name, band, signal, data used | `upstreamName`, `upstreamBand`, `signal`, `dataUsed` |
 | Saved settings | `settings` (stored in `UserDefaults`) |
+
+The updater is separate and real: `Model/Updater.swift` talks to GitHub, and `Updater.install()` is where a privileged helper would replace the TrollStore hand-off.
 
 The **Preview controls** group at the bottom of Settings can be deleted once the service is real.
 

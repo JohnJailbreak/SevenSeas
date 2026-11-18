@@ -19,6 +19,8 @@ enum AppWindow: Equatable {
     case settings
     case devices
     case status
+    /// The changelog. Drawn without the panel card behind it, like Dopamine's update screens.
+    case update
 }
 
 enum LogState: Equatable {

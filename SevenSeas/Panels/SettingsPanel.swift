@@ -16,7 +16,11 @@ enum SettingsPage: Hashable {
 
 struct SettingsPanel: View {
     @EnvironmentObject var model: AppModel
+    @EnvironmentObject var updater: Updater
     @State private var page: SettingsPage = .root
+    /// Mirrors UpdatePrefs so the switch can turn itself back off when iOS refuses notifications.
+    @State private var notificationsOn = UpdatePrefs.notificationsEnabled
+    @State private var notificationsRefused = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -41,6 +45,7 @@ struct SettingsPanel: View {
             networkGroup
             limitsGroup
             appGroup
+            updatesGroup
             actionsGroup
             previewGroup
         }
@@ -70,6 +75,84 @@ struct SettingsPanel: View {
             PanelGap()
             LinkRow(title: "Theme", value: model.theme.name) { page = .theme }
             LinkRow(title: "About") { page = .about }
+        }
+    }
+
+    /// Settings > Updates: the switch, the check, and a line saying what the last check found.
+    private var updatesGroup: some View {
+        VStack(spacing: 0) {
+            PanelGap()
+            SwitchRow(title: "Update Notifications", isOn: $notificationsOn)
+            checkRow
+            updatesFooter
+        }
+        .onAppear { updater.refreshLastChecked() }
+        .onChange(of: notificationsOn) { on in
+            guard on != UpdatePrefs.notificationsEnabled else { return }
+            // Turning it on asks iOS for permission first; refused, it stays off.
+            UpdateNotifications.setEnabled(on) { enabled in
+                notificationsRefused = on && !enabled
+                if notificationsOn != enabled { notificationsOn = enabled }
+            }
+        }
+    }
+
+    private var isChecking: Bool { return updater.manual == .checking }
+
+    private var checkRow: some View {
+        Button(action: checkForUpdates) {
+            HStack(spacing: 0) {
+                Text(isChecking ? "Checking for Updates..." : "Check for Updates")
+                    .font(.system(size: 17))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                if isChecking {
+                    ProgressView()
+                        .tint(Color.ssSecondary)
+                } else {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundColor(Color.ssSecondary)
+                }
+            }
+            .padding(.horizontal, 32)
+            .frame(width: Metrics.tableWidth, height: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(DimOnPressStyle())
+        .disabled(isChecking)
+    }
+
+    @ViewBuilder private var updatesFooter: some View {
+        if notificationsRefused {
+            PanelFooter(text: "Allow notifications for SevenSeas in Settings > Notifications, then try again.")
+        } else if let line = checkLine {
+            PanelFooter(text: line)
+        } else {
+            PanelFooter(text: "Checks GitHub for a newer release. TrollStore installs it.")
+        }
+    }
+
+    /// What the last check found, or when SevenSeas last checked.
+    private var checkLine: String? {
+        switch updater.manual {
+        case .upToDate(let version):
+            return "SevenSeas \(version) is up to date."
+        case .failed(let reason):
+            return "Couldn't check for updates: \(reason)."
+        case .idle, .checking:
+            guard let when = updater.lastChecked else { return nil }
+            let today = Calendar.current.isDateInToday(when)
+            let time = DateFormatter.localizedString(from: when, dateStyle: today ? .none : .short, timeStyle: .short)
+            return today ? "Last checked at \(time)." : "Last checked \(time)."
+        }
+    }
+
+    private func checkForUpdates() {
+        Haptics.light()
+        updater.checkNow { result in
+            if case .available = result { model.open(.update) }
         }
     }
 
