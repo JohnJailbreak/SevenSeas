@@ -1,0 +1,120 @@
+name: Build IPA
+
+# Every push to any branch builds an IPA you can download from the run's Artifacts.
+# Pushes to the default branch also publish a GitHub Release (v1.0.<run number>).
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 30
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install XcodeGen and ldid
+        run: brew install xcodegen ldid
+
+      - name: Work out the version
+        id: version
+        run: |
+          BASE=$(grep -E '^[[:space:]]*MARKETING_VERSION:' project.yml | head -n 1 | sed -E 's/.*"([0-9]+(\.[0-9]+)*)".*/\1/')
+          VERSION="${BASE}.${GITHUB_RUN_NUMBER}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building SevenSeas ${VERSION}"
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+
+      - name: Build (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project SevenSeas.xcodeproj \
+            -scheme SevenSeas \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            MARKETING_VERSION="${{ steps.version.outputs.version }}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=NO \
+            clean build 2>&1 | tee build.log
+
+      - name: Show compiler errors
+        if: failure()
+        run: grep -E "error:" build.log | sort -u | head -n 60 || true
+
+      - name: Upload the build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
+
+      - name: Package IPA and TIPA
+        run: |
+          APP=$(find build/Build/Products -maxdepth 2 -name "SevenSeas.app" -type d | head -n 1)
+          test -n "$APP" || { echo "SevenSeas.app was not produced"; exit 1; }
+          rm -rf Payload
+          mkdir Payload
+          cp -R "$APP" Payload/SevenSeas.app
+          ldid -Sentitlements.plist Payload/SevenSeas.app/SevenSeas
+          zip -qry SevenSeas.ipa Payload
+          cp SevenSeas.ipa SevenSeas.tipa
+          shasum -a 256 SevenSeas.ipa SevenSeas.tipa > SHA256SUMS
+          ls -lh SevenSeas.ipa SevenSeas.tipa SHA256SUMS
+
+      - name: Release notes
+        run: |
+          BEFORE="${{ github.event.before }}"
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            git log --no-merges --format='- %s' "${BEFORE}..${{ github.sha }}" > notes.md
+          fi
+          if [ ! -s notes.md ]; then
+            git log -1 --format='- %s' > notes.md
+          fi
+          cat notes.md
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SevenSeas-${{ steps.version.outputs.version }}
+          path: |
+            SevenSeas.ipa
+            SevenSeas.tipa
+            SHA256SUMS
+          if-no-files-found: error
+
+      - name: Publish release
+        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
+          body_path: notes.md
+          target_commitish: ${{ github.sha }}
+          make_latest: "true"
+          files: |
+            SevenSeas.ipa
+            SevenSeas.tipa
+            SHA256SUMS
