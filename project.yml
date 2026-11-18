@@ -1,0 +1,42 @@
+name: SevenSeas
+
+options:
+  bundleIdPrefix: com.johnjailbreak
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    # The workflow overrides both of these: version is 1.0.<run number>, build is the run number.
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  SevenSeas:
+    type: application
+    platform: iOS
+    sources:
+      - path: SevenSeas
+    info:
+      path: Config/Info.plist
+      properties:
+        CFBundleDisplayName: SevenSeas
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UIUserInterfaceStyle: Dark
+        UIRequiredDeviceCapabilities:
+          - arm64
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIRequiresFullScreen: true
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.johnjailbreak.sevenseas
+        PRODUCT_NAME: SevenSeas
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_BITCODE: NO

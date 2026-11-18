@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	The frontend needs no special entitlements. When the hotspot service is wired in, add what it
+	needs here (for example platform-application or com.apple.private.security.no-container).
+	ldid applies this file after the build, see .github/workflows/build.yml.
+	-->
+</dict>
+</plist>

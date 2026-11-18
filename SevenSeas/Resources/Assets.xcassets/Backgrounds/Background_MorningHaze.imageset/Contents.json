@@ -1,0 +1,13 @@
+{
+  "images": [
+    {
+      "filename": "morning_haze.jpg",
+      "idiom": "universal",
+      "scale": "3x"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}
