@@ -98,24 +98,29 @@ between the two is the mockup being approximate, not the app.
 The app icon is Lighthouse Beam, one icon for every theme, rendered at each iPhone slot size plus the 1024 pt marketing
 icon. `IconPreview.imageset` is the same artwork at 288 px for the Theme and About pages.
 
-### Why the icon's background is darker than the theme
+### The icon: Night Keeper
 
-The icon's background is a two-stop vertical gradient whose colours are sampled from the Morning Haze background
-itself: the mean of its top band and the mean of a band just past its middle, each scaled to a target relative
-luminance while keeping its hue.
+The background **is** Morning Haze: a square cut from the top of the background image, 1170 x 1170 px from its top
+edge, with the same Gaussian blur the app applies (38 px of the 1170 px width), scaled to 1024. Nothing is darkened or
+recoloured. The top of that square is the image's slate band, the bottom its soft blue.
 
-| | Sampled from Morning Haze | In the icon |
-|---|---|---|
-| Top | `(85, 105, 126)` | `(13, 16, 19)`, relative luminance 0.06 |
-| Bottom | `(118, 183, 240)` | `(57, 88, 116)`, relative luminance 0.33 |
+The lighthouse keeps the Lighthouse Beam geometry and is redrawn to read on a pale sky:
 
-The icon is darker than the theme on purpose. Morning Haze is a pale sky: white on its own colours gives a contrast
-ratio of about 1.0 at the bottom of the image and 2.0 behind the glyph, so a white lighthouse on the untouched sky is
-invisible at 60 px. Scaled into this range it is roughly 14:1 behind the glyph, and the hue is unchanged, so the icon
-still belongs to the theme. The sampled bottom colour lands on `(57, 88, 116)`, within a few units of the theme's own
-card colour `2E475C` = `(46, 71, 92)`, which is itself that sky darkened.
+| Part | Colour |
+|---|---|
+| Tower, lamp room, roof, finial, base | `#141E28`, a near-black slate (the theme's window colour, lifted slightly) |
+| The two stripes | `#BFDDF7` at 85%, the sky's own light blue |
+| Lamp glass | white |
+| Beams | white, fading from 85% at the lamp to nothing at the edges |
 
-Four other treatments were rendered and rejected: the sky used as-is (illegible), the sky graded down (murky, the
-clouds read as smudges), its top band alone (nearly black, loses the blue) and a graded version with saturation pushed
-back up (brown patches). The icon is one artwork for all ten themes; iOS alternate icons would be needed for per-theme
-icons, and they are not implemented.
+Measured along the lighthouse's outline against the sky just outside it, the median contrast is 4.2:1, and 69% of the
+outline clears 3:1, the WCAG threshold for graphics. The rest is where the light stripes and lamp glass meet the edge,
+by design. The dark tower reads best against the lighter lower sky; the white lamp and beams read against the darker
+slate at the top.
+
+Ten treatments were rendered on the same sky and compared at 180, 90 and 60 px on the in-app wallpaper. A white
+lighthouse on the untouched sky manages about 2:1, which is why the original white glyph wasn't kept as it was. An
+earlier version darkened the sky into a gradient to keep the glyph white; it was rejected because the background no
+longer looked like Morning Haze.
+
+The icon is one artwork for all ten themes. Per-theme icons would need iOS alternate icons, which are not implemented.
